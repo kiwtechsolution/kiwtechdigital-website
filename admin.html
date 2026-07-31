@@ -19,6 +19,7 @@
   input[type=password],input[type=text]{width:100%;padding:13px 16px;border:1.5px solid var(--line);border-radius:10px;}
   .btn{display:inline-flex;align-items:center;gap:6px;padding:11px 22px;border-radius:100px;font-weight:700;border:none;cursor:pointer;}
   .btn-primary{background:linear-gradient(100deg,var(--violet),var(--pink));color:#fff;}
+  .btn-sm{padding:7px 14px;font-size:.8rem;border-radius:8px;background:var(--mist);color:var(--ink);border:1px solid var(--line);cursor:pointer;}
   .btn-wa{background:#25D366;color:#fff;padding:8px 14px;font-size:.82rem;border-radius:8px;text-decoration:none;font-weight:700;}
   table{width:100%;border-collapse:collapse;font-size:.9rem;}
   th{text-align:left;padding:10px 12px;color:var(--slate);font-family:'IBM Plex Mono',monospace;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;border-bottom:2px solid var(--line);}
@@ -29,6 +30,10 @@
   .error{color:#DC2626;font-size:.85rem;margin-top:8px;}
   .msg{color:#059669;font-size:.85rem;margin-top:8px;}
   .empty{color:var(--slate);padding:24px 0;text-align:center;}
+  .hint{color:var(--slate);font-size:.85rem;margin-top:0;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:100px;font-size:.72rem;font-weight:700;}
+  .badge-on{background:#D1FAE5;color:#059669;}
+  .badge-off{background:#FEE2E2;color:#DC2626;}
 </style>
 </head>
 <body>
@@ -36,7 +41,7 @@
 <div id="loginScreen">
   <h1 style="margin-bottom:20px;">🔒 Kiwtech Digital Admin</h1>
   <div class="card">
-    <p style="color:var(--slate);margin-top:0;">Enter the admin password to view enquiries.</p>
+    <p class="hint">Enter the admin password to view enquiries.</p>
     <input type="password" id="pwInput" placeholder="Password">
     <button class="btn btn-primary" style="width:100%;margin-top:14px;" onclick="login()">Login</button>
     <p class="error" id="loginError"></p>
@@ -52,13 +57,36 @@
 
     <div class="card">
       <h2 style="font-size:1.1rem;margin-bottom:6px;">WhatsApp Number</h2>
-      <p style="color:var(--slate);font-size:.88rem;">This number is used by every "WhatsApp Us" / "Chat on WhatsApp" button on the live site.</p>
+      <p class="hint">Used by every "WhatsApp Us" button on the site, and by the AI chat when it hands off an interested visitor.</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-        <input type="text" id="waInput" placeholder="e.g. 919811506015 (country code + number, digits only)" style="max-width:340px;">
+        <input type="text" id="waInput" placeholder="e.g. 919811506015" style="max-width:340px;">
         <button class="btn btn-primary" onclick="updateWhatsapp()">Update</button>
       </div>
       <p class="error" id="waError"></p>
       <p class="msg" id="waMsg"></p>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:1.1rem;margin-bottom:6px;">AI Chat — OpenAI Key <span id="keyBadge" class="badge badge-off">Not set</span></h2>
+      <p class="hint">Powers the website's chat widget (bilingual English/Hinglish sales assistant). Key is stored securely and never shown again after saving.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <input type="password" id="keyInput" placeholder="sk-...">
+        <button class="btn btn-primary" onclick="updateKey()">Save Key</button>
+      </div>
+      <p class="error" id="keyError"></p>
+      <p class="msg" id="keyMsg"></p>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:1.1rem;margin-bottom:16px;">Follow-up Reminders (<span id="remCount">0</span>)</h2>
+      <p class="hint">When the chat assistant hears "I'll tell you tomorrow" or similar, it saves a reminder here automatically.</p>
+      <div id="remWrap">
+        <table id="remTable">
+          <thead><tr><th>Note</th><th>Contact</th><th>Saved</th><th></th></tr></thead>
+          <tbody id="remBody"></tbody>
+        </table>
+        <div class="empty" id="remEmpty" style="display:none;">No reminders yet.</div>
+      </div>
     </div>
 
     <div class="card">
@@ -118,7 +146,11 @@
       .then(function (d) {
         if (!d) return;
         renderLeads(d.leads || []);
+        renderReminders(d.reminders || []);
         document.getElementById('waInput').value = d.whatsapp || '';
+        var badge = document.getElementById('keyBadge');
+        if (d.openaiKeySet) { badge.textContent = 'Active'; badge.className = 'badge badge-on'; }
+        else { badge.textContent = 'Not set'; badge.className = 'badge badge-off'; }
         cb(true);
       })
       .catch(function () { cb(false); });
@@ -148,6 +180,40 @@
     });
   }
 
+  function renderReminders(reminders) {
+    var body = document.getElementById('remBody');
+    var empty = document.getElementById('remEmpty');
+    var open = reminders.filter(function (r) { return !r.done; });
+    document.getElementById('remCount').textContent = open.length;
+    body.innerHTML = '';
+    if (!reminders.length) { empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    reminders.forEach(function (r) {
+      var tr = document.createElement('tr');
+      if (r.done) tr.style.opacity = '0.45';
+      var date = r.created_at ? new Date(r.created_at).toLocaleString('en-IN') : '';
+      var waNum = (r.contact || '').replace(/\D/g, '');
+      if (waNum.length === 10) waNum = '91' + waNum;
+      var waBtn = waNum ? '<a class="btn-wa" target="_blank" rel="noopener" href="https://wa.me/' + waNum + '">WhatsApp</a>' : '';
+      tr.innerHTML =
+        '<td>' + escapeHtml(r.note || '') + '</td>' +
+        '<td>' + escapeHtml(r.contact || '—') + '</td>' +
+        '<td>' + date + '</td>' +
+        '<td style="display:flex;gap:8px;">' + waBtn +
+          (r.done ? '' : '<button class="btn-sm" onclick="markDone(' + r.id + ')">Mark done</button>') +
+        '</td>';
+      body.appendChild(tr);
+    });
+  }
+
+  function markDone(id) {
+    fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': currentPw() },
+      body: JSON.stringify({ action: 'mark_reminder_done', id: id })
+    }).then(function () { loadData(currentPw(), function () {}); });
+  }
+
   function escapeHtml(s) {
     var d = document.createElement('div');
     d.textContent = s;
@@ -162,7 +228,7 @@
     fetch('/api/admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-password': currentPw() },
-      body: JSON.stringify({ whatsapp: num })
+      body: JSON.stringify({ action: 'set_whatsapp', value: num })
     }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
         if (res.ok) { msgEl.textContent = 'WhatsApp number updated — live on the site immediately.'; }
@@ -171,7 +237,27 @@
       .catch(function () { errEl.textContent = 'Failed to update.'; });
   }
 
-  // auto-login if a valid session password is already stored
+  function updateKey() {
+    var key = document.getElementById('keyInput').value.trim();
+    var errEl = document.getElementById('keyError');
+    var msgEl = document.getElementById('keyMsg');
+    errEl.textContent = ''; msgEl.textContent = '';
+    fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': currentPw() },
+      body: JSON.stringify({ action: 'set_openai_key', value: key })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (res.ok) {
+          msgEl.textContent = 'OpenAI key saved — the chat assistant is now live.';
+          document.getElementById('keyInput').value = '';
+          document.getElementById('keyBadge').textContent = 'Active';
+          document.getElementById('keyBadge').className = 'badge badge-on';
+        } else { errEl.textContent = res.d.error || 'Failed to save.'; }
+      })
+      .catch(function () { errEl.textContent = 'Failed to save.'; });
+  }
+
   var saved = currentPw();
   if (saved) {
     loadData(saved, function (ok) { if (ok) showDash(); });
