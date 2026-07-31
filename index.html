@@ -230,6 +230,30 @@ img,svg{max-width:100%;display:block;}
   .cta-band{padding:48px 24px;}
   .contact-form div[style]{grid-template-columns:1fr !important;}
 }
+
+/* ---------- Chat widget ---------- */
+.chat-widget{position:fixed;bottom:22px;right:22px;z-index:200;}
+.chat-toggle{width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--violet),var(--pink));color:#fff;border:none;font-size:1.6rem;cursor:pointer;box-shadow:0 14px 30px -8px rgba(124,58,237,.55);transition:transform .2s;}
+.chat-toggle:hover{transform:scale(1.06);}
+.chat-panel{position:absolute;bottom:76px;right:0;width:346px;max-width:90vw;height:470px;background:#fff;border-radius:18px;box-shadow:0 24px 60px -16px rgba(26,21,51,.35);display:none;flex-direction:column;overflow:hidden;border:1px solid var(--line);}
+.chat-panel.open{display:flex;}
+.chat-header{display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(100deg,var(--violet),var(--pink));color:#fff;flex-shrink:0;}
+.chat-avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;}
+.chat-agent-name{font-weight:700;font-size:.92rem;}
+.chat-status{font-size:.72rem;opacity:.9;display:flex;align-items:center;gap:5px;}
+.chat-status .dot{width:7px;height:7px;border-radius:50%;background:#4ADE80;display:inline-block;}
+.chat-close{margin-left:auto;background:none;border:none;color:#fff;font-size:1.05rem;cursor:pointer;}
+.chat-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:var(--mist);}
+.chat-msg{max-width:82%;padding:10px 14px;border-radius:14px;font-size:.87rem;line-height:1.45;word-wrap:break-word;}
+.chat-msg-bot{background:#fff;border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px;}
+.chat-msg-user{background:linear-gradient(100deg,var(--violet),var(--pink));color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+.chat-typing{opacity:.6;font-style:italic;}
+.chat-wa-btn{align-self:flex-start;background:#25D366;color:#fff;text-decoration:none;padding:9px 14px;border-radius:12px;font-size:.84rem;font-weight:700;}
+.chat-input-row{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line);background:#fff;flex-shrink:0;}
+.chat-input-row input{flex:1;padding:10px 14px;border:1.5px solid var(--line);border-radius:100px;font-size:.87rem;font-family:inherit;}
+.chat-input-row input:focus{outline:none;border-color:var(--violet);}
+.chat-send{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--violet),var(--pink));color:#fff;border:none;cursor:pointer;font-size:1rem;flex-shrink:0;}
+@media (max-width:480px){.chat-panel{width:92vw;right:-6px;}}
 </style>
 </head>
 <body>
@@ -495,6 +519,130 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }).catch(function () {});
 });
+</script>
+<div class="chat-widget">
+  <button id="chatToggle" class="chat-toggle" aria-label="Chat with us">💬</button>
+  <div id="chatPanel" class="chat-panel">
+    <div class="chat-header">
+      <div class="chat-avatar" id="chatAvatar">P</div>
+      <div>
+        <div class="chat-agent-name" id="chatAgentName">Priya</div>
+        <div class="chat-status"><span class="dot"></span>Online now</div>
+      </div>
+      <button id="chatClose" class="chat-close" aria-label="Close chat">✕</button>
+    </div>
+    <div id="chatBody" class="chat-body"></div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="Type your message..." maxlength="500">
+      <button id="chatSend" class="chat-send" aria-label="Send">➤</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var AGENT_NAMES = ["Priya","Neha","Ananya","Riya","Simran","Kavya","Isha","Meera","Tanvi","Pooja"];
+  var agentName = sessionStorage.getItem('kwtd_agent');
+  if (!agentName) {
+    agentName = AGENT_NAMES[Math.floor(Math.random() * AGENT_NAMES.length)];
+    sessionStorage.setItem('kwtd_agent', agentName);
+  }
+
+  var history = [];
+  try { history = JSON.parse(sessionStorage.getItem('kwtd_chat_history') || '[]'); } catch (e) { history = []; }
+
+  var btn = document.getElementById('chatToggle');
+  var panel = document.getElementById('chatPanel');
+  var body = document.getElementById('chatBody');
+  var input = document.getElementById('chatInput');
+  var sendBtn = document.getElementById('chatSend');
+  var nameEl = document.getElementById('chatAgentName');
+  var avatarEl = document.getElementById('chatAvatar');
+
+  nameEl.textContent = agentName;
+  avatarEl.textContent = agentName.charAt(0);
+
+  function addMsg(role, text) {
+    var div = document.createElement('div');
+    div.className = 'chat-msg ' + (role === 'user' ? 'chat-msg-user' : 'chat-msg-bot');
+    div.textContent = text;
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function addWhatsappBtn(number, lastText) {
+    var a = document.createElement('a');
+    a.href = 'https://wa.me/' + number + '?text=' + encodeURIComponent('Hi, I want to know more about Kiwtech Digital services.');
+    a.target = '_blank'; a.rel = 'noopener';
+    a.className = 'chat-wa-btn';
+    a.textContent = '💬 Continue on WhatsApp';
+    body.appendChild(a);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function save() {
+    sessionStorage.setItem('kwtd_chat_history', JSON.stringify(history.slice(-20)));
+  }
+
+  function restoreHistory() {
+    if (history.length === 0) {
+      var greet = "Hi! I'm " + agentName + " from Kiwtech Digital 👋 We're a 360° digital marketing agency — Branding, Websites, SEO, Google & Meta Ads, and Business Consulting, all under one roof. Tell me a bit about your business and I'll guide you on what'll work best!";
+      addMsg('assistant', greet);
+      history.push({ role: 'assistant', content: greet });
+      save();
+    } else {
+      history.forEach(function (m) { addMsg(m.role === 'user' ? 'user' : 'assistant', m.content); });
+    }
+  }
+
+  function showTyping() {
+    var div = document.createElement('div');
+    div.className = 'chat-msg chat-msg-bot chat-typing';
+    div.id = 'chatTyping';
+    div.textContent = agentName + ' is typing...';
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+  }
+  function hideTyping() {
+    var t = document.getElementById('chatTyping');
+    if (t) t.remove();
+  }
+
+  function sendMessage() {
+    var text = input.value.trim();
+    if (!text) return;
+    addMsg('user', text);
+    history.push({ role: 'user', content: text });
+    save();
+    input.value = '';
+    showTyping();
+
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: history, agentName: agentName })
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        hideTyping();
+        addMsg('assistant', d.reply || "Could you tell me a bit more?");
+        history.push({ role: 'assistant', content: d.reply || '' });
+        save();
+        if (d.wants_whatsapp) addWhatsappBtn(d.whatsappNumber || '919811506015', text);
+      })
+      .catch(function () {
+        hideTyping();
+        addMsg('assistant', "Sorry, facing a small issue on my end — please WhatsApp us directly and we'll help right away!");
+      });
+  }
+
+  btn.addEventListener('click', function () {
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open') && !body.hasChildNodes()) restoreHistory();
+  });
+  document.getElementById('chatClose').addEventListener('click', function () { panel.classList.remove('open'); });
+  sendBtn.addEventListener('click', sendMessage);
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendMessage(); });
+})();
 </script>
 </body>
 </html>
