@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin | Kiwtech Digital</title>
+<meta name="robots" content="noindex, nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--violet:#7C3AED;--pink:#EC4899;--orange:#FF7A45;--ink:#1A1533;--slate:#645E7D;--mist:#F8F6FF;--line:#ECE7FB;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--mist);color:var(--ink);font-family:'Inter',sans-serif;}
+  h1,h2{font-family:'Fraunces',serif;margin:0;}
+  .topbar{background:linear-gradient(100deg,var(--violet),var(--pink));color:#fff;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;}
+  .topbar h1{font-size:1.3rem;}
+  .wrap{max-width:1100px;margin:0 auto;padding:32px 20px 60px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:28px;margin-bottom:24px;}
+  input,button,textarea{font-family:inherit;font-size:.95rem;}
+  input[type=password],input[type=text]{width:100%;padding:13px 16px;border:1.5px solid var(--line);border-radius:10px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:11px 22px;border-radius:100px;font-weight:700;border:none;cursor:pointer;}
+  .btn-primary{background:linear-gradient(100deg,var(--violet),var(--pink));color:#fff;}
+  .btn-wa{background:#25D366;color:#fff;padding:8px 14px;font-size:.82rem;border-radius:8px;text-decoration:none;font-weight:700;}
+  table{width:100%;border-collapse:collapse;font-size:.9rem;}
+  th{text-align:left;padding:10px 12px;color:var(--slate);font-family:'IBM Plex Mono',monospace;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;border-bottom:2px solid var(--line);}
+  td{padding:12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  #loginScreen{max-width:380px;margin:80px auto;text-align:center;}
+  #loginScreen .card{text-align:left;}
+  #dash{display:none;}
+  .error{color:#DC2626;font-size:.85rem;margin-top:8px;}
+  .msg{color:#059669;font-size:.85rem;margin-top:8px;}
+  .empty{color:var(--slate);padding:24px 0;text-align:center;}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <h1 style="margin-bottom:20px;">🔒 Kiwtech Digital Admin</h1>
+  <div class="card">
+    <p style="color:var(--slate);margin-top:0;">Enter the admin password to view enquiries.</p>
+    <input type="password" id="pwInput" placeholder="Password">
+    <button class="btn btn-primary" style="width:100%;margin-top:14px;" onclick="login()">Login</button>
+    <p class="error" id="loginError"></p>
+  </div>
+</div>
+
+<div id="dash">
+  <div class="topbar">
+    <h1>Kiwtech Digital — Admin</h1>
+    <button class="btn" style="background:rgba(255,255,255,.2);color:#fff;" onclick="logout()">Logout</button>
+  </div>
+  <div class="wrap">
+
+    <div class="card">
+      <h2 style="font-size:1.1rem;margin-bottom:6px;">WhatsApp Number</h2>
+      <p style="color:var(--slate);font-size:.88rem;">This number is used by every "WhatsApp Us" / "Chat on WhatsApp" button on the live site.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="waInput" placeholder="e.g. 919811506015 (country code + number, digits only)" style="max-width:340px;">
+        <button class="btn btn-primary" onclick="updateWhatsapp()">Update</button>
+      </div>
+      <p class="error" id="waError"></p>
+      <p class="msg" id="waMsg"></p>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:1.1rem;margin-bottom:16px;">Enquiries (<span id="leadCount">0</span>)</h2>
+      <div id="leadsWrap">
+        <table id="leadsTable">
+          <thead>
+            <tr><th>Name</th><th>Phone</th><th>Email</th><th>Service</th><th>Message</th><th>Date</th><th></th></tr>
+          </thead>
+          <tbody id="leadsBody"></tbody>
+        </table>
+        <div class="empty" id="emptyState" style="display:none;">No enquiries yet.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  var PASSWORD_KEY = 'kwtd_admin_pw';
+
+  function login() {
+    var pw = document.getElementById('pwInput').value;
+    document.getElementById('loginError').textContent = '';
+    loadData(pw, function (ok) {
+      if (ok) {
+        sessionStorage.setItem(PASSWORD_KEY, pw);
+        showDash();
+      } else {
+        document.getElementById('loginError').textContent = 'Incorrect password.';
+      }
+    });
+  }
+
+  function logout() {
+    sessionStorage.removeItem(PASSWORD_KEY);
+    document.getElementById('dash').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'block';
+    document.getElementById('pwInput').value = '';
+  }
+
+  function showDash() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('dash').style.display = 'block';
+  }
+
+  function currentPw() {
+    return sessionStorage.getItem(PASSWORD_KEY) || '';
+  }
+
+  function loadData(pw, cb) {
+    fetch('/api/admin', { headers: { 'x-admin-password': pw } })
+      .then(function (r) {
+        if (!r.ok) { cb(false); return null; }
+        return r.json();
+      })
+      .then(function (d) {
+        if (!d) return;
+        renderLeads(d.leads || []);
+        document.getElementById('waInput').value = d.whatsapp || '';
+        cb(true);
+      })
+      .catch(function () { cb(false); });
+  }
+
+  function renderLeads(leads) {
+    var body = document.getElementById('leadsBody');
+    var empty = document.getElementById('emptyState');
+    document.getElementById('leadCount').textContent = leads.length;
+    body.innerHTML = '';
+    if (!leads.length) { empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    leads.forEach(function (l) {
+      var tr = document.createElement('tr');
+      var date = l.created_at ? new Date(l.created_at).toLocaleString('en-IN') : '';
+      var waNum = (l.phone || '').replace(/\D/g, '');
+      if (waNum.length === 10) waNum = '91' + waNum;
+      tr.innerHTML =
+        '<td><b>' + escapeHtml(l.name || '') + '</b></td>' +
+        '<td>' + escapeHtml(l.phone || '') + '</td>' +
+        '<td>' + escapeHtml(l.email || '') + '</td>' +
+        '<td>' + escapeHtml(l.service || '') + '</td>' +
+        '<td style="max-width:220px;">' + escapeHtml(l.message || '') + '</td>' +
+        '<td>' + date + '</td>' +
+        '<td><a class="btn-wa" target="_blank" rel="noopener" href="https://wa.me/' + waNum + '">WhatsApp</a></td>';
+      body.appendChild(tr);
+    });
+  }
+
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function updateWhatsapp() {
+    var num = document.getElementById('waInput').value.trim();
+    var errEl = document.getElementById('waError');
+    var msgEl = document.getElementById('waMsg');
+    errEl.textContent = ''; msgEl.textContent = '';
+    fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': currentPw() },
+      body: JSON.stringify({ whatsapp: num })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (res.ok) { msgEl.textContent = 'WhatsApp number updated — live on the site immediately.'; }
+        else { errEl.textContent = res.d.error || 'Failed to update.'; }
+      })
+      .catch(function () { errEl.textContent = 'Failed to update.'; });
+  }
+
+  // auto-login if a valid session password is already stored
+  var saved = currentPw();
+  if (saved) {
+    loadData(saved, function (ok) { if (ok) showDash(); });
+  }
+
+  document.getElementById('pwInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') login();
+  });
+</script>
+</body>
+</html>
