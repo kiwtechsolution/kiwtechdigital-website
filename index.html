@@ -246,7 +246,7 @@ img,svg{max-width:100%;display:block;}
     </ul>
     <div class="nav-cta">
       <a href="#contact" class="btn btn-ghost">Talk to us</a>
-      <a href="https://wa.me/910000000000" class="btn btn-primary" target="_blank" rel="noopener">Get Free Consultation</a>
+      <a href="https://wa.me/919811506015" class="btn btn-primary wa-link" target="_blank" rel="noopener">Get Free Consultation</a>
     </div>
     <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false"><span></span></button>
   </nav>
@@ -388,7 +388,7 @@ img,svg{max-width:100%;display:block;}
     <p>Tell us about your business — we'll come back with a clear, no-jargon plan across the pillars that matter most for you right now.</p>
     <div class="cta-actions">
       <a href="#contact" class="btn btn-light">Get Free Consultation</a>
-      <a href="https://wa.me/910000000000" class="btn btn-ghost" target="_blank" rel="noopener">Chat on WhatsApp</a>
+      <a href="https://wa.me/919811506015" class="btn btn-ghost wa-link" target="_blank" rel="noopener">Chat on WhatsApp</a>
     </div>
   </div>
 
@@ -420,7 +420,7 @@ img,svg{max-width:100%;display:block;}
       <div><a href="/" class="logo"><span class="mark" aria-hidden="true"></span>Kiwtech Digital</a><p style="color:rgba(255,255,255,.6);max-width:280px;">A 360° growth partner for branding, technology, marketing, consulting and creative — based in Noida, India.</p></div>
       <div><h4>Services</h4><ul><li><a href="#services">Branding</a></li><li><a href="#services">Website &amp; Technology</a></li><li><a href="#services">Digital Marketing</a></li><li><a href="#services">Business Consulting</a></li><li><a href="#services">Creative Services</a></li></ul></div>
       <div><h4>Company</h4><ul><li><a href="#industries">Industries</a></li><li><a href="#why">Why Us</a></li><li><a href="#engage">How We Work</a></li><li><a href="#contact">Contact</a></li></ul></div>
-      <div><h4>Get in Touch</h4><ul><li><a href="mailto:hello@kiwtechdigital.com">hello@kiwtechdigital.com</a></li><li><a href="tel:+910000000000">+91 00000 00000</a></li><li><a href="https://wa.me/910000000000" target="_blank" rel="noopener">WhatsApp Us</a></li><li>Noida, Uttar Pradesh, India</li></ul></div>
+      <div><h4>Get in Touch</h4><ul><li><a href="mailto:hello@kiwtechdigital.com">hello@kiwtechdigital.com</a></li><li><a href="tel:+919811506015" class="tel-link">+91 98115 06015</a></li><li><a href="https://wa.me/919811506015" class="wa-link" target="_blank" rel="noopener">WhatsApp Us</a></li><li>Noida, Uttar Pradesh, India</li></ul></div>
     </div>
     <div class="footer-bottom"><span>© <span id="year"></span> Kiwtech Digital. All rights reserved.</span><span>Built &amp; maintained by Kiwtech Digital</span></div>
   </div>
@@ -456,12 +456,44 @@ document.addEventListener('DOMContentLoaded', function () {
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var data = new FormData(form);
-      var body = ['Name: ' + data.get('name'), 'Phone: ' + data.get('phone'), 'Email: ' + data.get('email'), 'Service: ' + data.get('service'), '', data.get('message')].join('\n');
-      var mailto = 'mailto:hello@kiwtechdigital.com?subject=' + encodeURIComponent('New enquiry from kiwtechdigital.com — ' + data.get('name')) + '&body=' + encodeURIComponent(body);
-      window.location.href = mailto;
-      if (note) note.textContent = 'Opening your email app to send this enquiry — or WhatsApp us directly for a faster reply.';
+      var payload = {
+        name: data.get('name'),
+        phone: data.get('phone'),
+        email: data.get('email'),
+        service: data.get('service'),
+        message: data.get('message')
+      };
+      var btn = form.querySelector('button[type="submit"]');
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+      fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function () {
+          if (note) note.textContent = "Thanks! We've received your enquiry and will reach out shortly — or WhatsApp us directly for a faster reply.";
+          form.reset();
+        })
+        .catch(function () {
+          if (note) note.textContent = "Something went wrong sending this. Please WhatsApp us directly instead.";
+        })
+        .finally(function () {
+          if (btn) { btn.disabled = false; btn.textContent = 'Send Enquiry'; }
+        });
     });
   }
+
+  // Keep WhatsApp / call links in sync with the number set in Admin
+  fetch('/api/whatsapp').then(function (r) { return r.ok ? r.json() : Promise.reject(); }).then(function (d) {
+    if (!d || !d.number) return;
+    document.querySelectorAll('.wa-link').forEach(function (a) {
+      var text = a.textContent;
+      a.href = 'https://wa.me/' + d.number;
+    });
+    document.querySelectorAll('.tel-link').forEach(function (a) {
+      a.href = 'tel:+' + d.number;
+    });
+  }).catch(function () {});
 });
 </script>
 </body>
