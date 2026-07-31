@@ -22,32 +22,79 @@ export default async function handler(req, res) {
       const leadsRes = await fetch(`${SUPABASE_URL}/rest/v1/enquiries?select=*&order=created_at.desc`, { headers });
       const leads = await leadsRes.json();
 
-      const wRes = await fetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.whatsapp_number&select=value`, { headers });
-      const wData = await wRes.json();
-      const whatsapp = (wData && wData[0] && wData[0].value) || '';
+      const remRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/reminders?select=*&order=created_at.desc`,
+        { headers }
+      );
+      const reminders = await remRes.json();
 
-      return res.status(200).json({ leads, whatsapp });
+      const sRes = await fetch(`${SUPABASE_URL}/rest/v1/settings?select=key,value`, { headers });
+      const sData = await sRes.json();
+      let whatsapp = '';
+      let openaiKeySet = false;
+      (sData || []).forEach((row) => {
+        if (row.key === 'whatsapp_number') whatsapp = row.value;
+        if (row.key === 'openai_api_key' && row.value) openaiKeySet = true;
+      });
+
+      return res.status(200).json({
+        leads: Array.isArray(leads) ? leads : [],
+        reminders: Array.isArray(reminders) ? reminders : [],
+        whatsapp,
+        openaiKeySet
+      });
     } catch (err) {
       return res.status(500).json({ error: 'Failed to load data', detail: String(err) });
     }
   }
 
   if (req.method === 'POST') {
-    const { whatsapp } = req.body || {};
-    if (!whatsapp || !/^\d{10,15}$/.test(whatsapp)) {
-      return res.status(400).json({ error: 'Enter a valid number with country code, digits only (e.g. 919811506015)' });
+    const { action, value, id } = req.body || {};
+
+    if (action === 'set_whatsapp') {
+      if (!value || !/^\d{10,15}$/.test(value)) {
+        return res.status(400).json({ error: 'Enter a valid number with country code, digits only (e.g. 919811506015)' });
+      }
+      await upsertSetting(SUPABASE_URL, headers, 'whatsapp_number', value);
+      return res.status(200).json({ ok: true });
     }
-    try {
-      await fetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.whatsapp_number`, {
+
+    if (action === 'set_openai_key') {
+      if (!value || value.length < 10) {
+        return res.status(400).json({ error: 'Enter a valid OpenAI API key' });
+      }
+      await upsertSetting(SUPABASE_URL, headers, 'openai_api_key', value);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (action === 'mark_reminder_done') {
+      if (!id) return res.status(400).json({ error: 'Missing reminder id' });
+      await fetch(`${SUPABASE_URL}/rest/v1/reminders?id=eq.${id}`, {
         method: 'PATCH',
         headers: { ...headers, Prefer: 'return=minimal' },
-        body: JSON.stringify({ value: whatsapp })
+        body: JSON.stringify({ done: true })
       });
       return res.status(200).json({ ok: true });
-    } catch (err) {
-      return res.status(500).json({ error: 'Failed to update', detail: String(err) });
     }
+
+    return res.status(400).json({ error: 'Unknown action' });
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
+}
+
+async function upsertSetting(SUPABASE_URL, headers, key, value) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.${key}`, {
+    method: 'PATCH',
+    headers: { ...headers, Prefer: 'return=representation' },
+    body: JSON.stringify({ value })
+  });
+  const data = await r.json().catch(() => []);
+  if (!Array.isArray(data) || data.length === 0) {
+    await fetch(`${SUPABASE_URL}/rest/v1/settings`, {
+      method: 'POST',
+      headers: { ...headers, Prefer: 'return=minimal' },
+      body: JSON.stringify([{ key, value }])
+    });
+  }
 }
