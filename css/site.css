@@ -45,6 +45,7 @@ img,svg{max-width:100%;display:block;}
 .nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;}
 .logo{display:flex;align-items:center;gap:10px;font-family:'Fraunces',serif;font-weight:800;font-size:1.25rem;}
 .logo .mark{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--violet),var(--pink),var(--orange));flex-shrink:0;}
+.logo .mark-img{width:34px;height:34px;border-radius:10px;object-fit:cover;flex-shrink:0;display:block;}
 .nav-links{display:flex;align-items:center;gap:30px;font-size:.94rem;font-weight:600;}
 .nav-links a{transition:color .2s;}
 .nav-links a:hover{color:var(--pink);}
